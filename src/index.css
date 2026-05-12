@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Outfit:wght@500;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg-main: #fefbf5;
+  --bg-surface: #ffffff;
+  --bg-soft: #f8f2e7;
+  --text-main: #0f172a;
+  --text-muted: #4b5563;
+  --line: #dfd4c0;
+  --brand: #1565c0;
+  --brand-soft: #dceeff;
+  --warn: #d84315;
+  --ok: #2e7d32;
+  --radius: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Manrope", sans-serif;
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at 10% 15%, #ffedd5 0%, transparent 30%),
+    radial-gradient(circle at 85% 20%, #dbeafe 0%, transparent 32%),
+    linear-gradient(160deg, #fefbf5 0%, #f9f5ea 100%);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Outfit", sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
