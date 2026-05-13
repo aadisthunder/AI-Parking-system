@@ -4,6 +4,7 @@ import {
   CheckCircle,
   CircleParking,
   LogOut,
+  MapPin,
   PlusCircle,
   Shield,
   Ticket,
@@ -13,12 +14,43 @@ import {
 
 const STORAGE_KEY = "parking-app-state-v1";
 const SESSION_KEY = "parking-app-session-v1";
-const TOTAL_SLOTS = 24;
+const SELECTED_LOT_KEY = "parking-app-selected-lot-v1";
 const ADMIN_CREDENTIALS = { name: "admin", password: "admin123" };
 const DEFAULT_USERS = [{ name: "user", password: "user123" }];
 
-const createDefaultSlots = () =>
-  Array.from({ length: TOTAL_SLOTS }, (_, index) => ({
+const PARKING_LOTS = [
+  {
+    id: "tier-1-central",
+    name: "Multi Level Car Parking (MLCP) Noida",
+    tier: "Tier 1",
+    address: "Road No. 18, Pocket L, Sector 18, Noida, Uttar Pradesh 201301, India",
+    mapsUrl: "https://maps.google.com/?cid=18290796702792015725",
+    totalSlots: 24,
+  },
+  {
+    id: "tier-2-techpark",
+    name: "Botanical Garden Metro Ground Parking",
+    tier: "Tier 2",
+    address:
+      "Ground Floor, Metro Station Botanical Garden, Botanical Garden, Sector 38, Noida, Uttar Pradesh 201301, India",
+    mapsUrl: "https://maps.google.com/?cid=5850919399519505826",
+    totalSlots: 18,
+  },
+  {
+    id: "tier-3-airport",
+    name: "Noida City Centre Metro Vehicle Parking",
+    tier: "Tier 3",
+    address: "H9G4+4GC, Sector 32, Noida, Uttar Pradesh 201301, India",
+    mapsUrl: "https://maps.google.com/?cid=16288879160551126182",
+    totalSlots: 30,
+  },
+];
+
+const buildGoogleMapsUrl = (query) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
+const createDefaultSlots = (totalSlots) =>
+  Array.from({ length: totalSlots }, (_, index) => ({
     id: index + 1,
     status: "vacant",
     reservedBy: null,
@@ -41,21 +73,47 @@ const normalizeSlot = (slot, index) => ({
       : [],
 });
 
+const coerceSlots = (storedSlots, totalSlots) => {
+  const defaults = createDefaultSlots(totalSlots);
+  if (!Array.isArray(storedSlots) || !storedSlots.length) return defaults;
+
+  const normalized = storedSlots.map((slot, index) => normalizeSlot(slot, index));
+  for (let index = 0; index < defaults.length; index += 1) {
+    if (!normalized[index]) continue;
+    defaults[index] = { ...defaults[index], ...normalized[index], id: index + 1 };
+  }
+  return defaults;
+};
+
+const createDefaultLots = () =>
+  Object.fromEntries(
+    PARKING_LOTS.map((lot) => [lot.id, createDefaultSlots(lot.totalSlots)]),
+  );
+
 const readStorage = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    const slots =
-      Array.isArray(parsed?.slots) && parsed.slots.length
-        ? parsed.slots.map((slot, index) => normalizeSlot(slot, index))
-        : createDefaultSlots();
     const users =
       Array.isArray(parsed?.users) && parsed.users.length
         ? parsed.users
         : DEFAULT_USERS;
 
-    return { slots, users };
+    const lots = createDefaultLots();
+
+    if (parsed?.lots && typeof parsed.lots === "object") {
+      for (const lot of PARKING_LOTS) {
+        lots[lot.id] = coerceSlots(parsed.lots?.[lot.id], lot.totalSlots);
+      }
+    } else if (Array.isArray(parsed?.slots) && parsed.slots.length) {
+      const primaryLot = PARKING_LOTS[0];
+      if (primaryLot) {
+        lots[primaryLot.id] = coerceSlots(parsed.slots, primaryLot.totalSlots);
+      }
+    }
+
+    return { lots, users };
   } catch {
-    return { slots: createDefaultSlots(), users: DEFAULT_USERS };
+    return { lots: createDefaultLots(), users: DEFAULT_USERS };
   }
 };
 
@@ -68,9 +126,18 @@ const readSession = () => {
   }
 };
 
+const readSelectedLotId = () => {
+  try {
+    const stored = localStorage.getItem(SELECTED_LOT_KEY);
+    return PARKING_LOTS.some((lot) => lot.id === stored) ? stored : null;
+  } catch {
+    return null;
+  }
+};
+
 function App() {
   const [initialData] = useState(() => readStorage());
-  const [slots, setSlots] = useState(initialData.slots);
+  const [lots, setLots] = useState(initialData.lots);
   const [users, setUsers] = useState(initialData.users);
   const [activeRole, setActiveRole] = useState("user");
   const [userAuthMode, setUserAuthMode] = useState("login");
@@ -83,10 +150,14 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [session, setSession] = useState(() => readSession());
   const [loginToast, setLoginToast] = useState(null);
+  const [selectedLotId, setSelectedLotId] = useState(() => readSelectedLotId());
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots, users }));
-  }, [slots, users]);
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: 2, lots, users }),
+    );
+  }, [lots, users]);
 
   useEffect(() => {
     if (session) {
@@ -106,24 +177,42 @@ function App() {
     return () => clearTimeout(timeoutId);
   }, [loginToast]);
 
+  useEffect(() => {
+    if (!selectedLotId) {
+      localStorage.removeItem(SELECTED_LOT_KEY);
+      return;
+    }
+    localStorage.setItem(SELECTED_LOT_KEY, selectedLotId);
+  }, [selectedLotId]);
+
+  const selectedLot = useMemo(
+    () => PARKING_LOTS.find((lot) => lot.id === selectedLotId) || null,
+    [selectedLotId],
+  );
+
+  const activeSlots = useMemo(
+    () => (selectedLotId ? lots?.[selectedLotId] ?? [] : []),
+    [lots, selectedLotId],
+  );
+
   const stats = useMemo(() => {
-    const vacant = slots.filter((slot) => slot.status === "vacant").length;
-    const occupied = slots.filter((slot) => slot.status === "occupied").length;
-    const reserved = slots.filter((slot) => slot.status === "reserved").length;
+    const vacant = activeSlots.filter((slot) => slot.status === "vacant").length;
+    const occupied = activeSlots.filter((slot) => slot.status === "occupied").length;
+    const reserved = activeSlots.filter((slot) => slot.status === "reserved").length;
 
     return { vacant, occupied, reserved };
-  }, [slots]);
+  }, [activeSlots]);
 
   const myReservations = useMemo(
     () =>
       session?.role === "user"
-        ? slots.filter(
+        ? activeSlots.filter(
             (slot) =>
               slot.status === "reserved" &&
               slot.reservedBy?.toLowerCase() === session.name.toLowerCase(),
           )
         : [],
-    [session, slots],
+    [activeSlots, session],
   );
 
   const login = (event) => {
@@ -196,14 +285,22 @@ function App() {
     setAuthError("");
   };
 
-  const updateSlot = (slotId, updater) => {
-    setSlots((prevSlots) =>
-      prevSlots.map((slot) => (slot.id === slotId ? updater(slot) : slot)),
-    );
+  const updateSlot = (lotId, slotId, updater) => {
+    if (!lotId) return;
+    setLots((prevLots) => {
+      const prevSlots = Array.isArray(prevLots?.[lotId]) ? prevLots[lotId] : [];
+      return {
+        ...prevLots,
+        [lotId]: prevSlots.map((slot) =>
+          slot.id === slotId ? updater(slot) : slot,
+        ),
+      };
+    });
   };
 
   const handleAdminToggleFilled = (slotId) => {
-    updateSlot(slotId, (slot) => {
+    if (!selectedLotId) return;
+    updateSlot(selectedLotId, slotId, (slot) => {
       if (slot.status === "occupied") {
         return { ...slot, status: "vacant", reservedBy: null };
       }
@@ -215,8 +312,8 @@ function App() {
   };
 
   const handleUserReserve = (slotId) => {
-    if (!session) return;
-    updateSlot(slotId, (slot) => {
+    if (!session || !selectedLotId) return;
+    updateSlot(selectedLotId, slotId, (slot) => {
       if (slot.status !== "vacant") return slot;
       const history = slot.reservationHistory.includes(session.name)
         ? slot.reservationHistory
@@ -232,8 +329,8 @@ function App() {
   };
 
   const handleUserCancel = (slotId) => {
-    if (!session) return;
-    updateSlot(slotId, (slot) => {
+    if (!session || !selectedLotId) return;
+    updateSlot(selectedLotId, slotId, (slot) => {
       const isMine =
         slot.reservedBy?.toLowerCase() === session.name.toLowerCase();
       if (slot.status === "reserved" && isMine) {
@@ -243,15 +340,23 @@ function App() {
     });
   };
 
-  const resetLot = () => setSlots(createDefaultSlots());
+  const resetLot = (lotId) => {
+    const lot = PARKING_LOTS.find((candidate) => candidate.id === lotId);
+    if (!lot) return;
+
+    setLots((prevLots) => ({
+      ...prevLots,
+      [lot.id]: createDefaultSlots(lot.totalSlots),
+    }));
+  };
 
   const reservedUsers = useMemo(() => {
-    const allUsers = slots
+    const allUsers = activeSlots
       .flatMap((slot) => slot.reservationHistory)
       .filter((value, index, self) => self.indexOf(value) === index);
 
     return allUsers;
-  }, [slots]);
+  }, [activeSlots]);
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -505,78 +610,210 @@ function App() {
               </div>
             </aside>
           </section>
-        ) : (
-          <section className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <StatsCard label="Vacant" value={stats.vacant} tone="vacant" />
-              <StatsCard
-                label="Reserved"
-                value={stats.reserved}
-                tone="reserved"
-              />
-              <StatsCard
-                label="Filled"
-                value={stats.occupied}
-                tone="occupied"
-              />
-            </div>
+	        ) : (
+	          <section className="space-y-5">
+	            <ParkingSelectCard
+	              lots={PARKING_LOTS}
+	              selectedLotId={selectedLotId}
+	              onSelect={setSelectedLotId}
+	              selectedLot={selectedLot}
+	            />
 
-            {session.role === "user" ? (
-              <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 text-sm text-[var(--text-muted)] shadow-sm">
-                <p className="inline-flex items-center gap-2 font-semibold text-slate-700">
-                  <Ticket size={16} /> My Reservations: {myReservations.length}
-                </p>
-                <p className="mt-1">
-                  Tap a vacant slot to reserve. Tap your reserved slot again to
-                  cancel.
-                </p>
-                <p className="mt-1">
-                  Users who have reserved slots:{" "}
-                  {reservedUsers.length ? reservedUsers.join(", ") : "None yet"}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={resetLot}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Reset Entire Lot
-                </button>
-                <p className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-soft)] px-4 py-2 text-sm text-slate-700">
-                  <Users size={16} /> Click any slot to mark it filled or
-                  vacant.
-                </p>
-                <p className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-700">
-                  <Ticket size={16} /> Reserved by users:{" "}
-                  {reservedUsers.length ? reservedUsers.join(", ") : "None"}
-                </p>
-              </div>
-            )}
+	            {selectedLotId ? (
+	              <>
+	                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+	                  <StatsCard
+	                    label="Total Slots"
+	                    value={activeSlots.length}
+	                    tone="total"
+	                  />
+	                  <StatsCard
+	                    label="Vacant"
+	                    value={stats.vacant}
+	                    tone="vacant"
+	                  />
+	                  <StatsCard
+	                    label="Reserved"
+	                    value={stats.reserved}
+	                    tone="reserved"
+	                  />
+	                  <StatsCard
+	                    label="Filled"
+	                    value={stats.occupied}
+	                    tone="occupied"
+	                  />
+	                </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-              {slots.map((slot) => (
-                <SlotCard
-                  key={slot.id}
-                  slot={slot}
-                  role={session.role}
-                  sessionName={session.name}
-                  onAdminToggle={handleAdminToggleFilled}
-                  onUserReserve={handleUserReserve}
-                  onUserCancel={handleUserCancel}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+	                {session.role === "user" ? (
+	                  <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 text-sm text-[var(--text-muted)] shadow-sm">
+	                    <p className="inline-flex items-center gap-2 font-semibold text-slate-700">
+	                      <Ticket size={16} /> My Reservations:{" "}
+	                      {myReservations.length}
+	                    </p>
+	                    <p className="mt-1">
+	                      Tap a vacant slot to reserve. Tap your reserved slot
+	                      again to cancel.
+	                    </p>
+	                    <p className="mt-1">
+	                      Users who have reserved slots:{" "}
+	                      {reservedUsers.length
+	                        ? reservedUsers.join(", ")
+	                        : "None yet"}
+	                    </p>
+	                  </div>
+	                ) : (
+	                  <div className="flex flex-wrap gap-3">
+	                    <button
+	                      type="button"
+	                      onClick={() => resetLot(selectedLotId)}
+	                      className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+	                    >
+	                      Reset Selected Parking
+	                    </button>
+	                    <p className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-soft)] px-4 py-2 text-sm text-slate-700">
+	                      <Users size={16} /> Click any slot to mark it filled or
+	                      vacant.
+	                    </p>
+	                    <p className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-700">
+	                      <Ticket size={16} /> Reserved by users:{" "}
+	                      {reservedUsers.length ? reservedUsers.join(", ") : "None"}
+	                    </p>
+	                  </div>
+	                )}
+
+	                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+	                  {activeSlots.map((slot) => (
+	                    <SlotCard
+	                      key={slot.id}
+	                      slot={slot}
+	                      role={session.role}
+	                      sessionName={session.name}
+	                      onAdminToggle={handleAdminToggleFilled}
+	                      onUserReserve={handleUserReserve}
+	                      onUserCancel={handleUserCancel}
+	                    />
+	                  ))}
+	                </div>
+	              </>
+	            ) : (
+	              <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 text-sm text-[var(--text-muted)] shadow-sm">
+	                <p className="inline-flex items-center gap-2 font-semibold text-slate-700">
+	                  <MapPin size={16} /> Select a parking location to view slots.
+	                </p>
+	                <p className="mt-1">
+	                  Choose one of the parkings above; then vacancy and slot
+	                  status will appear here.
+	                </p>
+	              </div>
+	            )}
+	          </section>
+	        )}
+	      </div>
+	    </main>
+	  );
+	}
+
+function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
+  return (
+    <article className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 shadow-sm">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-main)]">
+            Select Parking
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Pick a location to view vacancy and slots.
+          </p>
+        </div>
+        <div className="text-sm text-[var(--text-muted)]">
+          {selectedLot ? (
+            <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-soft)] px-3 py-2">
+              <MapPin size={16} />
+              Viewing:{" "}
+              <span className="font-semibold text-slate-800">
+                {selectedLot.name}
+              </span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-soft)] px-3 py-2">
+              <MapPin size={16} />
+              No parking selected
+            </span>
+          )}
+        </div>
       </div>
-    </main>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {lots.map((lot) => {
+          const selected = lot.id === selectedLotId;
+          const mapsUrl =
+            lot.mapsUrl ?? buildGoogleMapsUrl(`${lot.name}, ${lot.address}`);
+
+          return (
+            <div
+              key={lot.id}
+              onClick={() => onSelect(lot.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(lot.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className={`group cursor-pointer rounded-2xl border p-4 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+                selected
+                  ? "border-blue-300 bg-[var(--brand-soft)]"
+                  : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-400"
+              }`}
+              aria-pressed={selected}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {lot.tier}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-slate-900">
+                    {lot.name}
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                  {lot.totalSlots} slots
+                </span>
+              </div>
+
+              <p className="mt-2 text-sm text-slate-600">{lot.address}</p>
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span
+                  className={`text-xs font-semibold ${
+                    selected ? "text-blue-800" : "text-slate-500"
+                  }`}
+                >
+                  {selected ? "Selected" : "Select"}
+                </span>
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Google Maps
+                  <span className="text-slate-400">↗</span>
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </article>
   );
 }
 
 function StatsCard({ label, value, tone }) {
   const toneMap = {
+    total: "bg-slate-50 border-slate-200 text-slate-700",
     vacant: "bg-emerald-50 border-emerald-200 text-emerald-700",
     reserved: "bg-amber-50 border-amber-200 text-amber-700",
     occupied: "bg-rose-50 border-rose-200 text-rose-700",
