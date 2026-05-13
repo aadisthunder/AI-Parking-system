@@ -419,10 +419,7 @@ function App() {
                     : "User Dashboard"
                   : "Smart Parking System"}
               </h1>
-              <p className="mt-2 text-sm text-[var(--text-muted)] sm:text-base">
-                Responsive slot icons, local storage state, and role-based
-                actions in a light UI.
-              </p>
+              
             </div>
             {session ? (
               <button
@@ -649,15 +646,21 @@ function App() {
 	        ) : (
 	          <section className="space-y-5">
 	            {session.role === "admin" ? (
-	              <AdminAnalyticsCard analytics={analytics} />
+	              <AdminAnalyticsCard
+	                analytics={analytics}
+	                selectedLotId={selectedLotId}
+	                onSelect={setSelectedLotId}
+	              />
 	            ) : null}
 
-	            <ParkingSelectCard
-	              lots={PARKING_LOTS}
-	              selectedLotId={selectedLotId}
-	              onSelect={setSelectedLotId}
-	              selectedLot={selectedLot}
-	            />
+	            {session.role === "user" ? (
+	              <ParkingSelectCard
+	                lots={PARKING_LOTS}
+	                selectedLotId={selectedLotId}
+	                onSelect={setSelectedLotId}
+	                selectedLot={selectedLot}
+	              />
+	            ) : null}
 
 	            {selectedLotId ? (
 	              <>
@@ -865,7 +868,11 @@ function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
   );
 }
 
-function AdminAnalyticsCard({ analytics }) {
+function AdminAnalyticsCard({ analytics, selectedLotId, onSelect }) {
+  const visibleLots = selectedLotId
+    ? analytics.perLot.filter(({ lot }) => lot.id === selectedLotId)
+    : analytics.perLot;
+
   return (
     <article className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 shadow-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -890,15 +897,44 @@ function AdminAnalyticsCard({ analytics }) {
           <span className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
             Filled: {analytics.overall.occupied}
           </span>
+          {selectedLotId ? (
+            <button
+              type="button"
+              onClick={() => onSelect(null)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Change Location
+            </button>
+          ) : null}
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {analytics.perLot.map(({ lot, stats }) => (
-          <div
-            key={lot.id}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-          >
+        {visibleLots.map(({ lot, stats }) => {
+          const selected = lot.id === selectedLotId;
+          const nextSelection = selected ? null : lot.id;
+          const mapsUrl =
+            lot.mapsUrl ?? buildGoogleMapsUrl(`${lot.name}, ${lot.address}`);
+
+          return (
+            <div
+              key={lot.id}
+              onClick={() => onSelect(nextSelection)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(nextSelection);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selected}
+              className={`cursor-pointer rounded-2xl border p-4 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+                selected
+                  ? "border-blue-300 bg-[var(--brand-soft)]"
+                  : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-400"
+              }`}
+            >
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               {lot.tier}
             </p>
@@ -919,8 +955,29 @@ function AdminAnalyticsCard({ analytics }) {
                 Filled {stats.occupied}
               </span>
             </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <span
+                className={`text-xs font-semibold ${
+                  selected ? "text-blue-800" : "text-slate-500"
+                }`}
+              >
+                {selected ? "Selected" : "Select"}
+              </span>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Google Maps
+                <span className="text-slate-400">↗</span>
+              </a>
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </article>
   );
