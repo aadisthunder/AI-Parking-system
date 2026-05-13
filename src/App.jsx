@@ -49,6 +49,25 @@ const PARKING_LOTS = [
 const buildGoogleMapsUrl = (query) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
+const getSlotsStats = (slots) => {
+  const total = Array.isArray(slots) ? slots.length : 0;
+  if (!Array.isArray(slots) || !slots.length) {
+    return { total, vacant: 0, reserved: 0, occupied: 0 };
+  }
+
+  let vacant = 0;
+  let reserved = 0;
+  let occupied = 0;
+
+  for (const slot of slots) {
+    if (slot.status === "vacant") vacant += 1;
+    else if (slot.status === "reserved") reserved += 1;
+    else if (slot.status === "occupied") occupied += 1;
+  }
+
+  return { total, vacant, reserved, occupied };
+};
+
 const createDefaultSlots = (totalSlots) =>
   Array.from({ length: totalSlots }, (_, index) => ({
     id: index + 1,
@@ -196,12 +215,28 @@ function App() {
   );
 
   const stats = useMemo(() => {
-    const vacant = activeSlots.filter((slot) => slot.status === "vacant").length;
-    const occupied = activeSlots.filter((slot) => slot.status === "occupied").length;
-    const reserved = activeSlots.filter((slot) => slot.status === "reserved").length;
-
+    const { vacant, occupied, reserved } = getSlotsStats(activeSlots);
     return { vacant, occupied, reserved };
   }, [activeSlots]);
+
+  const analytics = useMemo(() => {
+    const perLot = PARKING_LOTS.map((lot) => {
+      const lotSlots = lots?.[lot.id] ?? [];
+      return { lot, stats: getSlotsStats(lotSlots) };
+    });
+
+    const overall = perLot.reduce(
+      (acc, entry) => ({
+        total: acc.total + entry.stats.total,
+        vacant: acc.vacant + entry.stats.vacant,
+        reserved: acc.reserved + entry.stats.reserved,
+        occupied: acc.occupied + entry.stats.occupied,
+      }),
+      { total: 0, vacant: 0, reserved: 0, occupied: 0 },
+    );
+
+    return { perLot, overall };
+  }, [lots]);
 
   const myReservations = useMemo(
     () =>
@@ -282,6 +317,7 @@ function App() {
 
   const logout = () => {
     setSession(null);
+    setSelectedLotId(null);
     setAuthError("");
   };
 
@@ -612,6 +648,10 @@ function App() {
           </section>
 	        ) : (
 	          <section className="space-y-5">
+	            {session.role === "admin" ? (
+	              <AdminAnalyticsCard analytics={analytics} />
+	            ) : null}
+
 	            <ParkingSelectCard
 	              lots={PARKING_LOTS}
 	              selectedLotId={selectedLotId}
@@ -714,6 +754,10 @@ function App() {
 	}
 
 function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
+  const visibleLots = selectedLotId
+    ? lots.filter((lot) => lot.id === selectedLotId)
+    : lots;
+
   return (
     <article className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 shadow-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -725,15 +769,24 @@ function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
             Pick a location to view vacancy and slots.
           </p>
         </div>
-        <div className="text-sm text-[var(--text-muted)]">
+        <div className="flex flex-wrap items-center justify-start gap-2 text-sm text-[var(--text-muted)] sm:justify-end">
           {selectedLot ? (
-            <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-soft)] px-3 py-2">
-              <MapPin size={16} />
-              Viewing:{" "}
-              <span className="font-semibold text-slate-800">
-                {selectedLot.name}
+            <>
+              <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-soft)] px-3 py-2">
+                <MapPin size={16} />
+                Viewing:{" "}
+                <span className="font-semibold text-slate-800">
+                  {selectedLot.name}
+                </span>
               </span>
-            </span>
+              <button
+                type="button"
+                onClick={() => onSelect(null)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Change Location
+              </button>
+            </>
           ) : (
             <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-soft)] px-3 py-2">
               <MapPin size={16} />
@@ -744,19 +797,20 @@ function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {lots.map((lot) => {
+        {visibleLots.map((lot) => {
           const selected = lot.id === selectedLotId;
           const mapsUrl =
             lot.mapsUrl ?? buildGoogleMapsUrl(`${lot.name}, ${lot.address}`);
+          const nextSelection = selected ? null : lot.id;
 
           return (
             <div
               key={lot.id}
-              onClick={() => onSelect(lot.id)}
+              onClick={() => onSelect(nextSelection)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  onSelect(lot.id);
+                  onSelect(nextSelection);
                 }
               }}
               role="button"
@@ -806,6 +860,67 @@ function ParkingSelectCard({ lots, selectedLotId, onSelect, selectedLot }) {
             </div>
           );
         })}
+      </div>
+    </article>
+  );
+}
+
+function AdminAnalyticsCard({ analytics }) {
+  return (
+    <article className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)] p-5 shadow-sm">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-main)]">
+            All Locations Analytics
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Live totals across all three parkings.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            Total: {analytics.overall.total}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+            Vacant: {analytics.overall.vacant}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            Reserved: {analytics.overall.reserved}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+            Filled: {analytics.overall.occupied}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {analytics.perLot.map(({ lot, stats }) => (
+          <div
+            key={lot.id}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {lot.tier}
+            </p>
+            <p className="mt-1 text-base font-bold text-slate-900">{lot.name}</p>
+            <p className="mt-1 text-sm text-slate-600">{lot.address}</p>
+
+            <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold">
+              <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-slate-700">
+                Total {stats.total}
+              </span>
+              <span className="rounded-xl bg-emerald-50 px-3 py-1.5 text-emerald-700">
+                Vacant {stats.vacant}
+              </span>
+              <span className="rounded-xl bg-amber-50 px-3 py-1.5 text-amber-700">
+                Reserved {stats.reserved}
+              </span>
+              <span className="rounded-xl bg-rose-50 px-3 py-1.5 text-rose-700">
+                Filled {stats.occupied}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </article>
   );
