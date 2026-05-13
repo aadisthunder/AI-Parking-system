@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CarFront,
+  CheckCircle,
   CircleParking,
   LogOut,
   PlusCircle,
@@ -81,6 +82,7 @@ function App() {
   const [registerSuccess, setRegisterSuccess] = useState("");
   const [authError, setAuthError] = useState("");
   const [session, setSession] = useState(() => readSession());
+  const [loginToast, setLoginToast] = useState(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ slots, users }));
@@ -93,6 +95,16 @@ function App() {
     }
     localStorage.removeItem(SESSION_KEY);
   }, [session]);
+
+  useEffect(() => {
+    if (!loginToast) return undefined;
+
+    const timeoutId = setTimeout(() => {
+      setLoginToast(null);
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, [loginToast]);
 
   const stats = useMemo(() => {
     const vacant = slots.filter((slot) => slot.status === "vacant").length;
@@ -140,7 +152,11 @@ function App() {
       }
     }
 
-    setSession({ role: activeRole, name: name.trim() });
+    const loggedInName = name.trim();
+    const loggedInRole = activeRole;
+
+    setSession({ role: loggedInRole, name: loggedInName });
+    setLoginToast({ role: loggedInRole, name: loggedInName });
     setName("");
     setPassword("");
   };
@@ -239,6 +255,14 @@ function App() {
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+      {loginToast ? (
+        <div className="fixed left-1/2 top-4 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-lg">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <CheckCircle size={16} />
+            Login successful: {loginToast.name} ({loginToast.role})
+          </p>
+        </div>
+      ) : null}
       <div className="mx-auto w-full max-w-7xl">
         <header className="mb-6 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg-surface)]/90 p-5 shadow-sm backdrop-blur sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -248,7 +272,11 @@ function App() {
                 Smart Parking Control
               </p>
               <h1 className="text-3xl font-bold leading-tight text-[var(--text-main)] sm:text-4xl">
-                Admin and User Parking Dashboard
+                {session
+                  ? session.role === "admin"
+                    ? "Admin Dashboard"
+                    : "User Dashboard"
+                  : "Smart Parking System"}
               </h1>
               <p className="mt-2 text-sm text-[var(--text-muted)] sm:text-base">
                 Responsive slot icons, local storage state, and role-based
