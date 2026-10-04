@@ -22,9 +22,11 @@ android/
 !.vscode/extensions.json
 .idea
 .DS_Store
+.freebuff/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-AI-Parking-System-debug.apk
+ParkSense-debug.apk
+

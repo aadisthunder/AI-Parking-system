@@ -1,28 +1,33 @@
-# 🅿️ AI Parking System
+<p align="center">
+  <img src="assets/logos/logo.svg" width="120" alt="ParkSense Logo" />
+</p>
 
-> **Smart parking, one tap away.** A hackathon MVP that turns parking chaos into a live, reserve-from-your-phone experience — with IoT sensors and ML camera detection planned as the next milestone.
+# 🅿️ ParkSense
 
-![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
-![Frontend](https://img.shields.io/badge/frontend-React%2019-61DAFB?logo=react&logoColor=white)
-![Build](https://img.shields.io/badge/build-Vite%208-646CFF?logo=vite&logoColor=white)
-![Styling](https://img.shields.io/badge/styling-Tailwind%20CSS%204-06B6D4?logo=tailwindcss&logoColor=white)
-![Wrapper](https://img.shields.io/badge/wrapper-Capacitor%208-53B9F5?logo=capacitor&logoColor=white)
-![Status](https://img.shields.io/badge/status-MVP%20%2F%20Idea--stage-orange)
+> **Smart parking, one tap away.** A hackathon MVP that turns parking chaos into a live, reserve-from-your-phone experience — designed for seamless integration with IoT sensors and ML camera detection.
+
+<p align="left">
+  <a href="https://github.com/aadisthunder/AI-Parking-system/releases/latest"><img src="https://img.shields.io/github/v/release/aadisthunder/AI-Parking-system?label=Latest%20APK&color=3DDC84&logo=android&logoColor=white" alt="Latest APK" /></a>
+  <img src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white" alt="Platform Android" />
+  <img src="https://img.shields.io/badge/frontend-React%2019-61DAFB?logo=react&logoColor=white" alt="React 19" />
+  <img src="https://img.shields.io/badge/build-Vite%208-646CFF?logo=vite&logoColor=white" alt="Vite 8" />
+  <img src="https://img.shields.io/badge/styling-Tailwind%20CSS%204-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/wrapper-Capacitor%208-53B9F5?logo=capacitor&logoColor=white" alt="Capacitor 8" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT" /></a>
+  <img src="https://img.shields.io/badge/status-MVP%20%2F%20Open--Source-blue" alt="Status MVP" />
+</p>
 
 ---
 
 ## ⬇️ Download the Android APK (MVP demo build)
 
-**[⬇️ Download AI-Parking-System-debug.apk](https://github.com/aadisthunder/AI-Parking-system/releases/latest/download/AI-Parking-System-debug.apk)** — latest MVP build from [GitHub Releases](https://github.com/aadisthunder/AI-Parking-system/releases).
+You can download and test the Android APK directly on your phone using either method below:
 
-| | |
-|---|---|
-| **File** | `AI-Parking-System-debug.apk` |
-| **Package ID** | `com.aiparkingsystem.app` |
-| **Requires** | Android 7.0+ (API 24), any phone |
-| **Signing** | Debug key — for demo/testing only (not a Play Store build) |
+| Direct Download & Build Details | Scan to Install on Phone |
+|---|:---:|
+| **[⬇️ Download ParkSense-debug.apk](https://github.com/aadisthunder/AI-Parking-system/releases/latest/download/ParkSense-debug.apk)**<br>*(Direct binary download from [GitHub Releases](https://github.com/aadisthunder/AI-Parking-system/releases))*<br><br>**Package ID:** `com.aiparkingsystem.app`<br>**Requires:** Android 7.0+ (API 24+)<br>**File Size:** ~4.5 MB<br>**Signing:** Debug key (testing/demo build) | ![Scan QR Code to Download APK](https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://github.com/aadisthunder/AI-Parking-system/releases/latest/download/ParkSense-debug.apk)<br><sub>Scan with mobile camera to download</sub> |
 
-**Install steps:** download the APK → open it on the phone → allow “Install unknown apps” when prompted → install → open **AI Parking System**.
+**Install steps:** download the APK → open it on the phone → allow “Install unknown apps” when prompted → install → open **ParkSense**.
 
 **Demo logins**
 
@@ -209,10 +214,39 @@ cd android
 
 ---
 
-## 🤝 Contributing / feedback
+## 🎨 Brand Identity & Logo
 
-This is an idea-stage MVP — issues and suggestions are welcome via [GitHub Issues](https://github.com/aadisthunder/AI-Parking-system/issues). If hardware, ML, or Android is your thing, the next milestones are open for collaboration.
+**ParkSense** features a minimalist, high-contrast visual identity designed for readability across Android launcher icons, status bars, web favicons, and repository branding:
+
+<p align="center">
+  <img src="assets/logos/parksense-logo.jpg" width="180" alt="ParkSense Logo" />
+  <br>
+  <sub><b>ParkSense</b> — Stylized 'P' integrated with a connected parking bay and upward telemetry signal.</sub>
+</p>
+
+- **Icon Mark:** A geometric 'P' fused directly with an angled parking slot marker and wireless telemetry waves.
+- **Color Palette:** Electric Indigo (`#4F46E5`) blending into Mint Green (`#10B981`) on a crisp white background.
+- **Icon Legibility:** Zero text clutter within the mark ensures high clarity from 16×16 favicons up to 512×512 launcher icons.
+- **Vector Source:** Scalable vector SVG asset is available at [`assets/logos/logo.svg`](assets/logos/logo.svg) and configured as [`public/favicon.svg`](public/favicon.svg).
 
 ---
 
-<sub>Built as a hackathon-grade MVP to prove the product experience; sensors and ML camera detection are the planned next chapter. CI/build artifacts: see [Releases](https://github.com/aadisthunder/AI-Parking-system/releases).</sub>
+## 📖 About This Project & Documentation
+
+- **Origins:** Originally created as a hackathon MVP to demonstrate how a mobile-first digital experience can eliminate parking congestion in Indian cities by bridging the information gap before drivers arrive.
+- **Current State:** A fully functional, on-device mobile experience built with React 19, Tailwind CSS 4, and Capacitor 8, complete with role-based access (Admin & User) and persistent client-side state.
+- **Future Vision:** Engineered with an explicit, modular roadmap to ingest real-world IoT telemetry (ESP32 + magnetometers) and edge computer vision (YOLOv8 + ANPR) without rewriting the core application interface.
+- **Documentation Standard:** Structured to provide complete clarity for open-source contributors, reviewers, and hackathon judges — complete with direct APK releases, scannable QR codes, and hardware/ML architecture blueprints.
+
+---
+
+## 🤝 Contributing & License
+
+Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, PR guidelines, and areas where you can help (IoT sensors, ML models, backend cloud sync).
+
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
+
+---
+
+<sub>Built as a hackathon-grade MVP to prove the product experience; sensors and ML camera detection are the planned next chapter. Published APK: see [Releases](https://github.com/aadisthunder/AI-Parking-system/releases).</sub>
+

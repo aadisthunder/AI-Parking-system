@@ -417,7 +417,7 @@ function App() {
                   ? session.role === "admin"
                     ? "Admin Dashboard"
                     : "User Dashboard"
-                  : "Smart Parking System"}
+                  : "ParkSense"}
               </h1>
               
             </div>
